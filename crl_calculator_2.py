@@ -56,7 +56,7 @@ def diffr_lim(energy, beam_div):
 # Reference - https://confluence.desy.de/pages/viewpage.action?pageId=137171886
 """
 defenergy = 9000 # default energy (eV)
-defbndwth = 0.5 # default bandwidth/FWHM (%)
+defbndwdth = 0.5 # default bandwidth/FWHM (%)
 defsource_pos = -35 # default source pos (m)
 defsource_sz = 0 # default source size (um)
 defbeam_div = 2.5 # default beam divergence (urad)
