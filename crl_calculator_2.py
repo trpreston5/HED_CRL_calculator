@@ -230,6 +230,7 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
             textout += "Beam size at "+str(key_comps[pos])+"m "+str(np.round(beam_sz, 2))+"um\n"
             
     # Check diffraction limits
+    crl1_img_dist, crl2_img_dist, crl3_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft)
     beam_d = np.dot(ray_trans_matrix(source_pos, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
     textout += "Diffraction limit at source "+str(np.round(diffr_lim(energy, abs(beam_d)), 0))+"um\n"
     beam_d = np.dot(ray_trans_matrix(crl1_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
