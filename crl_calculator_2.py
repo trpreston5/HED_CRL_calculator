@@ -198,7 +198,7 @@ def check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3):
     crl3_img_dist = crl3_posz_new + image_dist(obj=crl3_posz_new-crl2_img_dist, foc=f_crl3)
     return crl1_img_dist, crl2_img_dist, crl3_img_dist
 
-def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft=0, des_posz=0, textout):
+def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft, des_posz, textout):
     """Ray propogation and calculation of beam sizes along beamline. Returns beam sizes at positions along beamline."""
 
     crl3_posz_new = crl3_posz
@@ -252,7 +252,7 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
     
     return beam_vecs, textout   
 
-def calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, source_pos, source_sz, beam_div, crl3_posz_shft=0, des_posz=0):
+def calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, source_pos, source_sz, beam_div, crl3_posz_shft, des_posz):
     """First calculates focal lengths for this energy (eV). Then the total focal length of each lens set for the 
     chosen lens configuration crl1lens, crl2lens, crl3lens. Then propogates beam sizes through this for a source 
     size, position, and beam divergence."""
