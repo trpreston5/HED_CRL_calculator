@@ -265,13 +265,16 @@ def calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, source_pos, source_
     size, position, and beam divergence."""
     bndwdthev = np.round(0.5*1e-2*bndwdth*energy, 0) # Convert to HWHM in eV
     f_crl1, f_crl2, f_crl3 = return_all_f_crl(energy, crl1lens, crl2lens, crl3lens)
-    textout = "Energy "+str(energy)+" eV +/- "+str(bndwdthev)+"\n"
+    f_crl1p, f_crl2p, f_crl3p = return_all_f_crl(energy+bndwdthev, crl1lens, crl2lens, crl3lens)
+    f_crl1m, f_crl2m, f_crl3m = return_all_f_crl(energy-bndwdthev, crl1lens, crl2lens, crl3lens)
+    textout = "Energy "+str(energy)+" +/- "+str(bndwdthev)+" eV\n"
     textout += "Focal lengths "+str(f_crl1)+", "+str(f_crl2)+", "+str(f_crl3)+" m\n"
     textout += "Source "+str(np.round(source_pos, 3))+" m, Beam div. "+str(np.round(beam_div*1e6, 2))+" urad\n"
     crl1_img_dist, crl2_img_dist, crl3_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft)
+    crl1_img_distp, crl2_img_distp, crl3_img_distp = check_foc_pos(source_pos, f_crl1p, f_crl2p, f_crl3p, crl3_posz_shft)
     # Add here for bandwidth
     if f_crl1 != 0:
-        textout += "CRL 1 focus at "+str(np.round(crl1_img_dist, 3))+" m\n"
+        textout += "CRL 1 focus at "+str(np.round(crl1_img_dist, 3))+" + " +str(np.round(crl1_img_distp-crl1_img_dist, 3))" m\n"
     if f_crl2 != 0:
         textout += "CRL 2 focus at "+str(np.round(crl2_img_dist, 3))+" m\n"
     if f_crl3 != 0:
