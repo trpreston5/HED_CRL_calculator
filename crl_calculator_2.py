@@ -117,7 +117,7 @@ mono_posz = 853.5 # m
 hrmono_posz = 855.8 # m 
 # HED pop-in position
 hed_posz = 939.000 # m
-# TCC position
+# TCC position (IC1)
 tcc_posz = 971.300 # m
 # XTD6 shutter
 xtds_posz = 940.000 # m
@@ -218,7 +218,7 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
     key_comps = np.array([source_pos, crl1_posz, crl2_posz, crl3_posz_new, m1_posz, m2_posz, m3_posz, mono_posz, hrmono_posz, \
                           tcc_posz, xtds_posz, opts_posz, ibss_posz, des_posz])
     key_comps_names = np.array(["Source", "CRL1", "CRL2", "CRL3", "M1", "M2", "M3", "Mono", "HRMono", \
-                                "TCC", "XTD shutter", "OPT shutter", "IBS", "Chosen pos."])
+                                "IC1 TCC", "XTD shutter", "OPT shutter", "IBS", "Chosen pos."])
     # Check key components for safety
     szth = 200. # um
     for pos in np.arange(1, len(key_comps)):
@@ -272,13 +272,14 @@ def calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, source_pos, source_
     textout += "Source "+str(np.round(source_pos, 3))+" m, Beam div. "+str(np.round(beam_div*1e6, 2))+" urad\n"
     crl1_img_dist, crl2_img_dist, crl3_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft)
     crl1_img_distp, crl2_img_distp, crl3_img_distp = check_foc_pos(source_pos, f_crl1p, f_crl2p, f_crl3p, crl3_posz_shft)
+    crl1_img_distm, crl2_img_distm, crl3_img_distm = check_foc_pos(source_pos, f_crl1m, f_crl2m, f_crl3m, crl3_posz_shft)
     # Add here for bandwidth
     if f_crl1 != 0:
-        textout += "CRL 1 focus at "+str(np.round(crl1_img_dist, 3))+" + " +str(np.round(crl1_img_distp-crl1_img_dist, 3))" m\n"
+        textout += "CRL 1 focus at "+str(np.round(crl1_img_dist, 3))+" m + " +str(np.round((crl1_img_distp-crl1_img_dist)*1e3, 0))+" mm - "+str(np.round((crl1_img_dist-crl1_img_distm)*1e3, 0))+" mm\n"
     if f_crl2 != 0:
-        textout += "CRL 2 focus at "+str(np.round(crl2_img_dist, 3))+" m\n"
+        textout += "CRL 2 focus at "+str(np.round(crl2_img_dist, 3))+" m + " +str(np.round((crl2_img_distp-crl2_img_dist)*1e3, 0))+" mm - "+str(np.round((crl2_img_dist-crl2_img_distm)*1e3, 0))+" mm\n"
     if f_crl3 != 0:
-        textout += "CRL 3 focus at "+str(np.round(crl3_img_dist, 3))+" m\n"
+        textout += "CRL 3 focus at "+str(np.round(crl3_img_dist, 3))+" m + " +str(np.round((crl3_img_distp-crl3_img_dist)*1e3, 0))+" mm - "+str(np.round((crl3_img_dist-crl3_img_distm)*1e3, 0))+" mm\n"
         textout += "Shift CRL3 by "+str(np.round(tcc_posz - crl3_img_dist, 3)*1e3)+" mm\n"
     #crl1foc = calc_crlfoc(energy, crl1roc) # Calculate focal length of each lens arm
     #crl2foc = calc_crlfoc(energy, crl2roc)
@@ -410,7 +411,7 @@ class MainWindow(QWidget):
         centralLayout.addWidget(self.msg2, 15, 1)
         
         self.warn1 = QLabel("")
-        centralLayout.addWidget(QLabel("Warnings:"), 16, 0)
+        centralLayout.addWidget(QLabel("Output and warnings:"), 16, 0)
         centralLayout.addWidget(self.warn1, 17, 1)
         
         self.xdata = np.arange(10)
@@ -597,7 +598,7 @@ class MainWindow(QWidget):
         self.plot1.axes.vlines(crl3_posz, ymin, ymax, color="grey", linestyle="--", label="CRL3 "+str(crl3_posz))
         self.plot1.axes.text(crl3_posz, 0.01*ymax, "CRL3", color="grey") 
         self.plot1.axes.vlines(tcc_posz, ymin, ymax, color="red", linestyle="--", label="TCC "+str(tcc_posz))
-        self.plot1.axes.text(tcc_posz, 0.2*ymax, "TCC", color="red") 
+        self.plot1.axes.text(tcc_posz, 0.2*ymax, "TCC", color="red")
         self.plot1.axes.vlines([m1_posz, m2_posz, m3_posz], ymin, ymax, color="pink", linestyle="-.", label="Mirrors")
         #self.plot1.axes.text(m1_posz, 0.01*ymax, "M1", color="pink") 
         self.plot1.axes.text(m2_posz, 0.1*ymax, "Mirrors", color="pink") 
@@ -625,7 +626,7 @@ class MainWindow(QWidget):
         self.plot2.axes.text(opts_posz, 0.9*ymax, "OPT", color="purple") 
         self.plot2.axes.text(ibss_posz, 0.9*ymax, "IBS", color="purple") 
         self.plot2.axes.vlines(tcc_posz, ymin, ymax, color="red", linestyle="--", label="TCC "+str(tcc_posz))
-        self.plot2.axes.text(tcc_posz, 0.8*ymax, "TCC", color="red") 
+        self.plot2.axes.text(tcc_posz, 0.8*ymax, "TCC1", color="red")
         #self.plot2.axes.legend()
         # Trigger the canvas to update and redraw.
         self.plot2.draw()
