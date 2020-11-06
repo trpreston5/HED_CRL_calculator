@@ -56,6 +56,7 @@ def diffr_lim(energy, beam_div):
 # Reference - https://confluence.desy.de/pages/viewpage.action?pageId=137171886
 """
 defenergy = 9000 # default energy (eV)
+defbndwdth = 0.5 # default bandwidth/FWHM (%)
 defsource_pos = -35 # default source pos (m)
 defsource_sz = 0 # default source size (um)
 defbeam_div = 2.5 # default beam divergence (urad)
@@ -116,7 +117,7 @@ mono_posz = 853.5 # m
 hrmono_posz = 855.8 # m 
 # HED pop-in position
 hed_posz = 939.000 # m
-# TCC position
+# TCC position (IC1)
 tcc_posz = 971.300 # m
 # XTD6 shutter
 xtds_posz = 940.000 # m
@@ -142,6 +143,16 @@ def calc_totalf(crllens, crlfoc):
         f_crl = 1./f_crl
     f_crl = np.round(f_crl, 3)
     return f_crl
+
+def return_all_f_crl(energy, crl1lens, crl2lens, crl3lens):
+    """Convert lens settings into focal lengths for energy."""
+    crl1foc = calc_crlfoc(energy, crl1roc) # Calculate focal length of each lens arm
+    crl2foc = calc_crlfoc(energy, crl2roc)
+    crl3foc = calc_crlfoc(energy, crl3roc)
+    f_crl1 = calc_totalf(crl1lens, crl1foc) # chosen config
+    f_crl2 = calc_totalf(crl2lens, crl2foc)
+    f_crl3 = calc_totalf(crl3lens, crl3foc)
+    return f_crl1, f_crl2, f_crl3
 
 def free_space_matrix(dist):
     """https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis for free space propogation"""
@@ -180,14 +191,22 @@ def ray_trans_matrix(position, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shf
                 mat = np.matmul(free_space_matrix(position - (crl3_posz+crl3_posz_shft)), mat)
     return mat
 
-def ray_propogation(energy, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft=0, des_posz=0):
+def check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft):
+    """Check position of foci for each CRL lens set)"""
+    crl3_posz_new = crl3_posz
+    if abs(crl3_posz_shft) <= 0.5:
+        crl3_posz_new = crl3_posz_new + crl3_posz_shft # Shift CRL3
+    else:
+        textout += "WARNING: Requested CRL3 shift "+str(crl3_posz_shft*1000)+" is > 500mm\n"
+        crl3_posz_shft = 0
+    crl1_img_dist = crl1_posz + image_dist(obj=crl1_posz-source_pos, foc=f_crl1) # calculate image distance for focal length
+    crl2_img_dist = crl2_posz + image_dist(obj=crl2_posz-crl1_img_dist, foc=f_crl2) 
+    crl3_img_dist = crl3_posz_new + image_dist(obj=crl3_posz_new-crl2_img_dist, foc=f_crl3)
+    return crl1_img_dist, crl2_img_dist, crl3_img_dist
+
+def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft, des_posz, textout):
     """Ray propogation and calculation of beam sizes along beamline. Returns beam sizes at positions along beamline."""
-    textout = "Energy "+str(energy)+" eV\n"
-    textout += "Focal lengths "+str(f_crl1)+", "+str(f_crl2)+", "+str(f_crl3)+" m\n"
-    textout += "Source "+str(np.round(source_pos, 3))+" m, Beam div. "+str(np.round(beam_div*1e6, 2))+" urad\n"
-    #textout += "Source "+str(np.round(source_pos, 3))+" m, beam size "+str(np.round(source_sz, 2))+" um, "\
-     #     "Beam div. "+str(np.round(beam_div*1e6, 2))+" urad\n"
-        
+
     crl3_posz_new = crl3_posz
     if abs(crl3_posz_shft) <= 0.5:
         crl3_posz_new = crl3_posz_new + crl3_posz_shft # Shift CRL3
@@ -195,23 +214,11 @@ def ray_propogation(energy, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_c
         textout += "WARNING: Requested CRL3 shift "+str(crl3_posz_shft*1000)+" is > 500mm\n"
         crl3_posz_shft = 0
         
-    # Check focus positions
-    crl1_img_dist = crl1_posz + image_dist(obj=crl1_posz-source_pos, foc=f_crl1) # calculate image distance for focal length
-    crl2_img_dist = crl2_posz + image_dist(obj=crl2_posz-crl1_img_dist, foc=f_crl2) 
-    crl3_img_dist = crl3_posz_new + image_dist(obj=crl3_posz_new-crl2_img_dist, foc=f_crl3)
-    if f_crl1 != 0:
-        textout += "CRL 1 focus at "+str(np.round(crl1_img_dist, 3))+" m\n"
-    if f_crl2 != 0:
-        textout += "CRL 2 focus at "+str(np.round(crl2_img_dist, 3))+" m\n"
-    if f_crl3 != 0:
-        textout += "CRL 3 focus at "+str(np.round(crl3_img_dist, 3))+" m\n"
-        textout += "Shift CRL3 by "+str(np.round(tcc_posz - crl3_img_dist, 3)*1e3)+" mm\n"
-        
     init_vec = np.array([source_sz, beam_div*1e6]) # Initial beam vector
     key_comps = np.array([source_pos, crl1_posz, crl2_posz, crl3_posz_new, m1_posz, m2_posz, m3_posz, mono_posz, hrmono_posz, \
                           tcc_posz, xtds_posz, opts_posz, ibss_posz, des_posz])
     key_comps_names = np.array(["Source", "CRL1", "CRL2", "CRL3", "M1", "M2", "M3", "Mono", "HRMono", \
-                                "TCC", "XTD shutter", "OPT shutter", "IBS", "Chosen pos."])
+                                "IC1 TCC", "XTD shutter", "OPT shutter", "IBS", "Chosen pos."])
     # Check key components for safety
     szth = 200. # um
     for pos in np.arange(1, len(key_comps)):
@@ -223,6 +230,7 @@ def ray_propogation(energy, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_c
             textout += "Beam size at "+str(key_comps[pos])+"m "+str(np.round(beam_sz, 2))+"um\n"
             
     # Check diffraction limits
+    crl1_img_dist, crl2_img_dist, crl3_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft)
     beam_d = np.dot(ray_trans_matrix(source_pos, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
     textout += "Diffraction limit at source "+str(np.round(diffr_lim(energy, abs(beam_d)), 0))+"um\n"
     beam_d = np.dot(ray_trans_matrix(crl1_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
@@ -251,19 +259,35 @@ def ray_propogation(energy, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_c
     
     return beam_vecs, textout   
 
-def calculate(energy, crl1lens, crl2lens, crl3lens, source_pos, source_sz, beam_div, crl3_posz_shft=0, des_posz=0):
+def calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, source_pos, source_sz, beam_div, crl3_posz_shft, des_posz):
     """First calculates focal lengths for this energy (eV). Then the total focal length of each lens set for the 
     chosen lens configuration crl1lens, crl2lens, crl3lens. Then propogates beam sizes through this for a source 
     size, position, and beam divergence."""
-    crl1foc = calc_crlfoc(energy, crl1roc) # Calculate focal length of each lens arm
-    crl2foc = calc_crlfoc(energy, crl2roc)
-    crl3foc = calc_crlfoc(energy, crl3roc)
-    f_crl1 = calc_totalf(crl1lens, crl1foc) # chosen config
-    f_crl2 = calc_totalf(crl2lens, crl2foc)
-    f_crl3 = calc_totalf(crl3lens, crl3foc)
-    beam_vecs, textout = ray_propogation(energy, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft, des_posz)
-    #crl1_pts, crl2_pts, crl3_pts, warning = calculate_beam_sizes(energy, source_pos, source_sz, beam_div, \
-    #                                                    f_crl1, f_crl2, f_crl3, crl3_posz_shft) # prop
+    bndwdthev = np.round(0.5*1e-2*bndwdth*energy, 0) # Convert to HWHM in eV
+    f_crl1, f_crl2, f_crl3 = return_all_f_crl(energy, crl1lens, crl2lens, crl3lens)
+    f_crl1p, f_crl2p, f_crl3p = return_all_f_crl(energy+bndwdthev, crl1lens, crl2lens, crl3lens)
+    f_crl1m, f_crl2m, f_crl3m = return_all_f_crl(energy-bndwdthev, crl1lens, crl2lens, crl3lens)
+    textout = "Energy "+str(energy)+" +/- "+str(bndwdthev)+" eV\n"
+    textout += "Focal lengths "+str(f_crl1)+", "+str(f_crl2)+", "+str(f_crl3)+" m\n"
+    textout += "Source "+str(np.round(source_pos, 3))+" m, Beam div. "+str(np.round(beam_div*1e6, 2))+" urad\n"
+    crl1_img_dist, crl2_img_dist, crl3_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft)
+    crl1_img_distp, crl2_img_distp, crl3_img_distp = check_foc_pos(source_pos, f_crl1p, f_crl2p, f_crl3p, crl3_posz_shft)
+    crl1_img_distm, crl2_img_distm, crl3_img_distm = check_foc_pos(source_pos, f_crl1m, f_crl2m, f_crl3m, crl3_posz_shft)
+    # Add here for bandwidth
+    if f_crl1 != 0:
+        textout += "CRL 1 focus at "+str(np.round(crl1_img_dist, 3))+" m + " +str(np.round((crl1_img_distp-crl1_img_dist)*1e3, 0))+" mm - "+str(np.round((crl1_img_dist-crl1_img_distm)*1e3, 0))+" mm\n"
+    if f_crl2 != 0:
+        textout += "CRL 2 focus at "+str(np.round(crl2_img_dist, 3))+" m + " +str(np.round((crl2_img_distp-crl2_img_dist)*1e3, 0))+" mm - "+str(np.round((crl2_img_dist-crl2_img_distm)*1e3, 0))+" mm\n"
+    if f_crl3 != 0:
+        textout += "CRL 3 focus at "+str(np.round(crl3_img_dist, 3))+" m + " +str(np.round((crl3_img_distp-crl3_img_dist)*1e3, 0))+" mm - "+str(np.round((crl3_img_dist-crl3_img_distm)*1e3, 0))+" mm\n"
+        textout += "Shift CRL3 by "+str(np.round(tcc_posz - crl3_img_dist, 3)*1e3)+" mm\n"
+    #crl1foc = calc_crlfoc(energy, crl1roc) # Calculate focal length of each lens arm
+    #crl2foc = calc_crlfoc(energy, crl2roc)
+    #crl3foc = calc_crlfoc(energy, crl3roc)
+    #f_crl1 = calc_totalf(crl1lens, crl1foc) # chosen config
+    #f_crl2 = calc_totalf(crl2lens, crl2foc)
+    #f_crl3 = calc_totalf(crl3lens, crl3foc)
+    beam_vecs, textout = ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft, des_posz, textout)
     return beam_vecs[:2], textout
 
 def fit_linear(params, xi, yi=0):
@@ -315,9 +339,14 @@ class MainWindow(QWidget):
         centralLayout.addWidget(self.energy, 1, 1)
         self.energy.editingFinished.connect(self.calculate_click)
         
+        self.bndwdth = QLineEdit(str(defbndwdth))
+        centralLayout.addWidget(QLabel("Bandwidth (%):"), 2, 0)
+        centralLayout.addWidget(self.bndwdth, 2, 1)
+        self.bndwdth.editingFinished.connect(self.calculate_click)
+        
         self.source_pos = QLineEdit(str(defsource_pos))
-        centralLayout.addWidget(QLabel("Source position (m):"), 2, 0)
-        centralLayout.addWidget(self.source_pos, 2, 1)
+        centralLayout.addWidget(QLabel("Source position (m):"), 3, 0)
+        centralLayout.addWidget(self.source_pos, 3, 1)
         self.source_pos.editingFinished.connect(self.calculate_click)
         
         #self.source_sz = QLineEdit(str(defsource_sz))
@@ -382,7 +411,7 @@ class MainWindow(QWidget):
         centralLayout.addWidget(self.msg2, 15, 1)
         
         self.warn1 = QLabel("")
-        centralLayout.addWidget(QLabel("Warnings:"), 16, 0)
+        centralLayout.addWidget(QLabel("Output and warnings:"), 16, 0)
         centralLayout.addWidget(self.warn1, 17, 1)
         
         self.xdata = np.arange(10)
@@ -569,7 +598,7 @@ class MainWindow(QWidget):
         self.plot1.axes.vlines(crl3_posz, ymin, ymax, color="grey", linestyle="--", label="CRL3 "+str(crl3_posz))
         self.plot1.axes.text(crl3_posz, 0.01*ymax, "CRL3", color="grey") 
         self.plot1.axes.vlines(tcc_posz, ymin, ymax, color="red", linestyle="--", label="TCC "+str(tcc_posz))
-        self.plot1.axes.text(tcc_posz, 0.2*ymax, "TCC", color="red") 
+        self.plot1.axes.text(tcc_posz, 0.2*ymax, "TCC", color="red")
         self.plot1.axes.vlines([m1_posz, m2_posz, m3_posz], ymin, ymax, color="pink", linestyle="-.", label="Mirrors")
         #self.plot1.axes.text(m1_posz, 0.01*ymax, "M1", color="pink") 
         self.plot1.axes.text(m2_posz, 0.1*ymax, "Mirrors", color="pink") 
@@ -597,7 +626,7 @@ class MainWindow(QWidget):
         self.plot2.axes.text(opts_posz, 0.9*ymax, "OPT", color="purple") 
         self.plot2.axes.text(ibss_posz, 0.9*ymax, "IBS", color="purple") 
         self.plot2.axes.vlines(tcc_posz, ymin, ymax, color="red", linestyle="--", label="TCC "+str(tcc_posz))
-        self.plot2.axes.text(tcc_posz, 0.8*ymax, "TCC", color="red") 
+        self.plot2.axes.text(tcc_posz, 0.8*ymax, "TCC1", color="red")
         #self.plot2.axes.legend()
         # Trigger the canvas to update and redraw.
         self.plot2.draw()
@@ -607,6 +636,10 @@ class MainWindow(QWidget):
             energy = float(self.energy.text())
         except:
             energy = defenergy
+        try:
+            bndwdth = float(self.bndwdth.text())
+        except:
+            bndwdth = defbndwdth
         try:
             source_pos = float(self.source_pos.text())
         except:
@@ -630,7 +663,7 @@ class MainWindow(QWidget):
         crl1lens = self.checkcrl1()
         crl2lens = self.checkcrl2()
         crl3lens = self.checkcrl3()
-        crl3_pts, warning = calculate(energy, crl1lens, crl2lens, crl3lens, \
+        crl3_pts, warning = calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, \
                                       source_pos, source_sz, beam_div, crl3_posz_shft, des_posz)
         self.warn1.setText(str(warning))
         self.xdata = crl3_pts[0]
