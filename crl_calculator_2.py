@@ -51,6 +51,10 @@ def diffr_lim(energy, beam_div):
     """Returns diffraction limited size in um for a beam of energy (eV) and divergence (urad)."""
     return 0.5*nmtoev(energy)*1e-3/np.sin(beam_div*1e-6)
 
+# https://en.wikipedia.org/wiki/Rayleigh_length
+def rayl_len(energy, beam_sz):
+    """Returns Rayleigh length in mm for diffraction limited beam size in um for a beam of energy (eV)."""
+    return np.pi*(0.5*beam_sz)**2/nmtoev(energy)
 
 """Fixed lens parameters and component positions
 # Reference - https://confluence.desy.de/pages/viewpage.action?pageId=137171886
@@ -229,19 +233,31 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
         if key_comps[pos] != 0.0 and pos == len(key_comps)-1:
             textout += "Beam size at "+str(key_comps[pos])+"m "+str(np.round(beam_sz, 2))+"um\n"
             
-    # Check diffraction limits
+    # Check diffraction limits and Rayleigh length
     crl1_img_dist, crl2_img_dist, crl3_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft)
     beam_d = np.dot(ray_trans_matrix(source_pos, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
-    textout += "Diffraction limit at source "+str(np.round(diffr_lim(energy, abs(beam_d)), 0))+"um\n"
+    beam_szdlim = diffr_lim(energy, abs(beam_d))
+    beam_raylen = rayl_len(energy, beam_szdlim)
+    textout += "Diffraction limit at source "+str(np.round(beam_szdlim, 0))+"um\n"
+    textout += "Rayleigh length at source +/- "+str(np.round(beam_raylen, 0))+"mm\n"
     beam_d = np.dot(ray_trans_matrix(crl1_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
+    beam_szdlim = diffr_lim(energy, abs(beam_d))
+    beam_raylen = rayl_len(energy, beam_szdlim)
     if f_crl1 != 0:
-        textout += "Diffraction limit at CRL1 focus "+str(np.round(diffr_lim(energy, abs(beam_d)), 0))+"um\n"
+        textout += "Diffraction limit at CRL1 focus "+str(np.round(beam_szdlim, 0))+"um\n"
+        textout += "Rayleigh length at CRL1 focus +/- "+str(np.round(beam_raylen, 0))+"mm\n"
     beam_d = np.dot(ray_trans_matrix(crl2_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
+    beam_szdlim = diffr_lim(energy, abs(beam_d))
+    beam_raylen = rayl_len(energy, beam_szdlim)
     if f_crl2 != 0:
-        textout += "Diffraction limit at CRL2 focus "+str(np.round(diffr_lim(energy, abs(beam_d)), 2))+"um\n"
+        textout += "Diffraction limit at CRL2 focus "+str(np.round(beam_szdlim, 0))+"um\n"
+        textout += "Rayleigh length at CRL2 focus +/- "+str(np.round(beam_raylen, 0))+"mm\n"
     beam_d = np.dot(ray_trans_matrix(crl3_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, crl3_posz_shft), init_vec)[1]
+    beam_szdlim = diffr_lim(energy, abs(beam_d))
+    beam_raylen = rayl_len(energy, beam_szdlim)
     if f_crl3 != 0:
-        textout += "Diffraction limit at CRL3 focus "+str(np.round(diffr_lim(energy, abs(beam_d)), 2))+"um\n"
+        textout += "Diffraction limit at CRL3 focus "+str(np.round(beam_szdlim, 0))+"um\n"
+        textout += "Rayleigh length at CRL3 focus +/- "+str(np.round(beam_raylen, 0))+"mm\n"
     
     # Full calculation
     positions = np.arange(int(source_pos/10.0), 94)*10.0 # Every 10m up to XTD shutter
