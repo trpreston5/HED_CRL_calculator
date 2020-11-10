@@ -51,6 +51,10 @@ def diffr_lim(energy, beam_div):
     """Returns diffraction limited size in um for a beam of energy (eV) and divergence (urad)."""
     return 0.5*nmtoev(energy)*1e-3/np.sin(beam_div*1e-6)
 
+# https://en.wikipedia.org/wiki/Rayleigh_length
+def rayl_len(energy, beam_sz):
+    """Returns Rayleigh length in mm for diffraction limited beam size in um for a beam of energy (eV)."""
+    return np.pi*(0.5*beam_sz)**2/nmtoev(energy)
 
 """Fixed lens parameters and component positions
 # Reference - https://confluence.desy.de/pages/viewpage.action?pageId=137171886
