@@ -123,6 +123,8 @@ hrmono_posz = 855.8 # m
 hed_posz = 939.000 # m
 # TCC position (IC1)
 tcc_posz = 971.300 # m
+# TCC position (IC2)
+tcc2_posz = 974.985 # m 3685mm down of IC1
 # XTD6 shutter
 xtds_posz = 940.000 # m
 # OPT shutter
