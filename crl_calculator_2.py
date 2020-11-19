@@ -310,9 +310,9 @@ def calculate(energy, bndwdth, crl1lens, crl2lens, crl3lens, source_pos, source_
     beam_vecs, textout = ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, f_crl2, f_crl3, crl3_posz_shft, des_posz, textout)
     return beam_vecs[:2], textout
 
-def fit_linear(params, xi, yi=0):
-    """Minimise function ycalc - ydata = 0."""
-    return params[0]*xi + params[1] - yi
+#def fit_linear(params, xi, yi=0):
+#   """Minimise function ycalc - ydata = 0."""
+#    return params[0]*xi + params[1] - yi
 
 def calc_div(energy, crl1lens, fel_beamsz, hed_beamsz_wl):
     """Calculates beam divergence and source position for the chosen set-up)"""
@@ -321,20 +321,25 @@ def calc_div(energy, crl1lens, fel_beamsz, hed_beamsz_wl):
     posz = np.array([fel_posz, hed_posz])
     beamszs = np.array([fel_beamsz, hed_beamsz_wl])
     errszs = 0.1*beamszs # set to be 10%
-    toterrsz = np.sqrt(np.dot(errszs, errszs)) # Sum in quadrature
-    params = 1, 0
-    fit, fiterr = scipy.optimize.leastsq(fit_linear, params, args=(posz, beamszs))
-    imagedist = -fit[1]/fit[0] - crl1_posz
-    errimagedist = toterrsz/fit[0] # convert to error in distance
+    # y = fit0 * x + fit1
+    fit0 = (beamszs[1] - beamszs[0])/(posz[1] - posz[0])
+    fit1 = (beamszs[0]*posz[1] - beamszs[1]*posz[0])/(posz[1] - posz[0])
+    errfit0 = abs(np.sqrt(errszs[0]**2+errszs[1]**2)/(posz[1] - posz[0]))
+    errfit1 = abs(np.sqrt((posz[0]*errszs[1])**2 + (posz[1]*errszs[0])**2)/(posz[1] - posz[0]))
+    # Calculate image distance, i.e. where y=0
+    imagedist = -fit1/fit0 - crl1_posz
+    errimagedist = abs(np.sqrt(errfit1**2 + (fit1*errfit0/fit0)**2)/fit0) # convert to error in distance
     objdist = image_dist(obj=imagedist, foc=f_crl1)
     errobjdist = abs(errimagedist*(objdist/imagedist)**2) # Convert to error in source point from lens formula
     newsourcepos = crl1_posz - objdist
-    #print("Image dist.", imagedist, "Focal length", f_crl1)
-    newbeamdiv = fel_beamsz/(fel_posz-newsourcepos)
-    errbeamdiv = abs(errszs[0]/(fel_posz-newsourcepos) + newbeamdiv*errobjdist/(fel_posz-newsourcepos)) # error in divergence
-    #print("Calculate source pos. and beam div.")
-    #print("Source pos.", np.round(newsourcepos, 1), "m, error", np.round(errobjdist, 1), "m")
-    #print("Beam divergence", np.round(newbeamdiv, 2), "urad, error", np.round(errbeamdiv, 2), "urad")
+    # Calculate beam size and error at CRL1 lens
+    crl1_beamsz = fit0*crl1_posz + fit1
+    errcrl1sz = abs(np.sqrt((errfit0*crl1_posz)**2 + errfit1**2))
+    # To give the divergence from source point to CRL1
+    newbeamdiv = crl1_beamsz/(crl1_posz-newsourcepos)
+    errbeamdiv = abs(np.sqrt(errcrl1sz**2 + (errobjdist/(crl1_posz-newsourcepos))**2)/(crl1_posz-newsourcepos))
+    #newbeamdiv = fel_beamsz/(fel_posz-newsourcepos)
+    #errbeamdiv = abs(np.sqrt(errszs[0]**2 + (errobjdist/(fel_posz-newsourcepos))**2)/(fel_posz-newsourcepos))
     return np.round(newsourcepos, 1), np.round(newbeamdiv, 2), np.round(errobjdist, 1), np.round(errbeamdiv, 2)
     
 """Here is the GUI part"""
