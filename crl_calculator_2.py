@@ -321,6 +321,7 @@ def calc_div(energy, crl1lens, fel_beamsz, hed_beamsz_wl):
     posz = np.array([fel_posz, hed_posz])
     beamszs = np.array([fel_beamsz, hed_beamsz_wl])
     errszs = 0.1*beamszs # set to be 10%
+    #Fix here
     toterrsz = np.sqrt(np.dot(errszs, errszs)) # Sum in quadrature
     params = 1, 0
     fit, fiterr = scipy.optimize.leastsq(fit_linear, params, args=(posz, beamszs))
