@@ -95,6 +95,7 @@ crl2roc[9] = 3.5*np.ones(10)
 crl2roc[10] = 2.0*np.ones(8)
 
 crl3_posz = 962.325 #m
+crl3_posz_new = crl3_posz # set default value
 crl3roc = {} # mm
 crl3roc[1] = 5.8*np.ones(1)
 crl3roc[2] = 5.8*np.ones(3)
@@ -108,9 +109,9 @@ crl3roc[9] = 0.5*np.ones(10)
 crl3roc[10] = 5.8*np.ones(2)
 
 crl4_posz = 974.8 #m  (roughly 350cm after target, 200cm after flange)
-crl4_posz_new = crl4_posz # set default value for plotting later
+crl4_posz_new = crl4_posz # set default value
 crl4roc = {} # mm
-crl4roc[1] = 0.05*np.ones(10)
+crl4roc[1] = 0.05*np.ones(17)
 crl4roc[2] = 0.05*np.ones(20)
 
 # FEL imager position 
@@ -187,7 +188,7 @@ def lens_matrix(flen):
     return mat
 
 """Ray propogation with matrix formalism."""
-def ray_trans_matrix(position, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft=0):
+def ray_trans_matrix(position, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new):
     """Only accepts single positions (not arrays) and calculates the ray transfer matrix:
     https://en.wikipedia.org/wiki/Ray_transfer_matrix_analysis"""
     if position < crl1_posz:
@@ -200,16 +201,16 @@ def ray_trans_matrix(position, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_
         elif position >= crl2_posz:
             mat = np.matmul(free_space_matrix(crl2_posz - crl1_posz), mat)
             mat = np.matmul(lens_matrix(f_crl2), mat)
-            if position < crl3_posz+crl3_posz_shft:
+            if position < crl3_posz_new:
                 mat = np.matmul(free_space_matrix(position - crl2_posz), mat)
-            elif position >= crl3_posz+crl3_posz_shft:
-                mat = np.matmul(free_space_matrix(crl3_posz+crl3_posz_shft - crl2_posz), mat)
+            elif position >= crl3_posz_new:
+                mat = np.matmul(free_space_matrix(crl3_posz_new - crl2_posz), mat)
                 mat = np.matmul(lens_matrix(f_crl3), mat)
                 #mat = np.matmul(free_space_matrix(position - (crl3_posz+crl3_posz_shft)), mat)
                 if position < crl4_posz_new:
-                    mat = np.matmul(free_space_matrix(position - (crl3_posz+crl3_posz_shft)), mat)
+                    mat = np.matmul(free_space_matrix(position - crl3_posz_new), mat)
                 elif position >= crl4_posz_new:
-                    mat = np.matmul(free_space_matrix(crl4_posz_new - (crl3_posz+crl3_posz_shft)), mat)
+                    mat = np.matmul(free_space_matrix(crl4_posz_new - crl3_posz_new), mat)
                     mat = np.matmul(lens_matrix(f_crl4), mat)
                     mat = np.matmul(free_space_matrix(position - crl4_posz_new), mat)
     return mat
@@ -248,7 +249,7 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
     # Check key components for safety
     szth = 200. # um
     for pos in np.arange(1, len(key_comps)):
-        beam_sz = np.dot(ray_trans_matrix(key_comps[pos], source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft), init_vec)[0]
+        beam_sz = np.dot(ray_trans_matrix(key_comps[pos], source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new), init_vec)[0]
         beam_sz = abs(beam_sz)
         if beam_sz < szth:
             textout += "WARNING: Beam size at "+key_comps_names[pos]+" "+str(np.round(beam_sz, 2))+"um\n"
@@ -257,24 +258,24 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
             
     # Check diffraction limits and Rayleigh length
     crl1_img_dist, crl2_img_dist, crl3_img_dist, crl4_img_dist = check_foc_pos(source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_shft, crl4_posz_shft)
-    beam_d = np.dot(ray_trans_matrix(source_pos, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft), init_vec)[1]
+    beam_d = np.dot(ray_trans_matrix(source_pos, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new), init_vec)[1]
     beam_szdlim = diffr_lim(energy, abs(beam_d))
     beam_raylen = rayl_len(energy, beam_szdlim)
     textout += "Diffraction limit at source "+str(np.round(beam_szdlim, 1))+"um\n"
     textout += "Rayleigh length at source +/- "+str(np.round(beam_raylen, 1))+"mm\n"
-    beam_d = np.dot(ray_trans_matrix(crl1_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft), init_vec)[1]
+    beam_d = np.dot(ray_trans_matrix(crl1_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new), init_vec)[1]
     beam_szdlim = diffr_lim(energy, abs(beam_d))
     beam_raylen = rayl_len(energy, beam_szdlim)
     if f_crl1 != 0:
         textout += "Diffraction limit at CRL1 focus "+str(np.round(beam_szdlim, 1))+"um\n"
         textout += "Rayleigh length at CRL1 focus +/- "+str(np.round(beam_raylen, 1))+"mm\n"
-    beam_d = np.dot(ray_trans_matrix(crl2_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft), init_vec)[1]
+    beam_d = np.dot(ray_trans_matrix(crl2_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new), init_vec)[1]
     beam_szdlim = diffr_lim(energy, abs(beam_d))
     beam_raylen = rayl_len(energy, beam_szdlim)
     if f_crl2 != 0:
         textout += "Diffraction limit at CRL2 focus "+str(np.round(beam_szdlim, 1))+"um\n"
         textout += "Rayleigh length at CRL2 focus +/- "+str(np.round(beam_raylen, 1))+"mm\n"
-    beam_d = np.dot(ray_trans_matrix(crl3_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft), init_vec)[1]
+    beam_d = np.dot(ray_trans_matrix(crl3_img_dist-1, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new), init_vec)[1]
     beam_szdlim = diffr_lim(energy, abs(beam_d))
     beam_raylen = rayl_len(energy, beam_szdlim)
     if f_crl3 != 0:
@@ -289,7 +290,7 @@ def ray_propogation(energy, bndwdthev, source_pos, source_sz, beam_div, f_crl1, 
     
     beam_vec = {}
     for pos in positions:
-        beam_vec[pos] = np.dot(ray_trans_matrix(pos, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl4_posz_new, crl3_posz_shft), init_vec)
+        beam_vec[pos] = np.dot(ray_trans_matrix(pos, source_pos, f_crl1, f_crl2, f_crl3, f_crl4, crl3_posz_new, crl4_posz_new), init_vec)
     new_pos = np.array([key for key in beam_vec.keys()]) # Dict only takes unique positions
     beam_vecs = np.array([(val[0], val[1]) for val in beam_vec.values()]).T # Values
     beam_vecs = np.append(new_pos, beam_vecs)
@@ -375,7 +376,7 @@ class MainWindow(QWidget):
         
         topLayout = QGridLayout()
         self.msg0 = QLabel("Calculator for CRL focus positions and beam sizes for the HED instrument.\n"\
-        "Copyright Thomas Preston (c) 2020, European X-Ray Free-Electron Laser Facility GmbH\n"\
+        "Copyright Thomas Preston (c) 2021, European X-Ray Free-Electron Laser Facility GmbH\n"\
         "All rights reserved.")
         topLayout.addWidget(self.msg0, 1, 0)
         
@@ -591,8 +592,8 @@ class MainWindow(QWidget):
         
     def buildcrl4group(self):
         groupBox = QGroupBox()
-        self.c41 = QCheckBox("0.05 X 10", self)
-        self.c42 = QCheckBox("0.05 X 20", self)
+        self.c41 = QCheckBox(str(crl4roc[1][0])+" X "+str(len(crl4roc[1])), self)
+        self.c42 = QCheckBox(str(crl4roc[2][0])+" X "+str(len(crl4roc[2])), self)
         hbox = QHBoxLayout()
         hbox.addWidget(self.c41)
         hbox.addWidget(self.c42)
